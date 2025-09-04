@@ -1,0 +1,32 @@
+# Maven build output
+target/
+
+# IDE & project files
+.idea/
+*.iml
+.classpath
+.project
+.settings/
+
+# VCS
+.git/
+.gitignore
+
+# OS cruft
+.DS_Store
+Thumbs.db
+
+# Logs & temp
+*.log
+*.tmp
+*.swp
+
+# Maven wrapper cache (optional to include if using wrapper)
+.mvn/
+mvnw
+mvnw.cmd
+
+# Node/Front-end (if present)
+node_modules/
+dist/
+build/

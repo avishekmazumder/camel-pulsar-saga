@@ -1,0 +1,18 @@
+spring:
+  pulsar:
+    client:
+      service-url: pulsar://pulsar:6650
+
+app:
+  pulsar:
+    admin-url: "http://pulsar:8080"
+    service-a:
+      command-topic: "persistent://public/default/service-a.commands"
+      response-topic: "persistent://public/default/service-a.responses"
+      compensate-topic: "persistent://public/default/service-a.compensate"
+      reply-subscription: "orchestrator-a-replies"
+    service-b:
+      command-topic: "persistent://public/default/service-b.commands"
+      response-topic: "persistent://public/default/service-b.responses"
+      compensate-topic: "persistent://public/default/service-b.compensate"
+      reply-subscription: "orchestrator-b-replies"

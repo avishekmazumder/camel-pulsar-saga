@@ -1,0 +1,19 @@
+spring:
+  profiles:
+    active: local
+  pulsar:
+    consumer:
+      subscription:
+        name: my-subscription
+
+    defaults:
+      type-mappings:
+        - messageType: com.example.model.CommandMessage
+          schema-info:
+            schema-type: JSON
+        - messageType: com.example.model.TagRequest
+          schema-info:
+            schema-type: JSON
+        - messageType: com.example.model.ReplyMessage
+          schema-info:
+            schema-type: JSON
