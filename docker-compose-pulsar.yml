@@ -6,7 +6,7 @@ services:
       PULSAR_MEM: -Xms512m -Xmx512m -XX:MaxDirectMemorySize=1g
     ports:
       - 6650:6650
-      - 8085:8080
+      - 8080:8080
     restart: unless-stopped
     networks:
       - app-net

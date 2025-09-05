@@ -3,6 +3,8 @@ package com.example.messaging;
 import com.example.model.CommandMessage;
 import com.example.model.ReplyMessage;
 import com.example.model.TagRequest;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.pulsar.client.api.PulsarClientException;
 import org.apache.pulsar.client.api.SubscriptionType;
 import org.apache.pulsar.common.schema.SchemaType;
@@ -13,29 +15,36 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.pulsar.annotation.PulsarListener;
 
 import org.springframework.pulsar.core.PulsarTemplate;
+import org.springframework.pulsar.listener.AckMode;
 import org.springframework.pulsar.listener.Acknowledgement;
 import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
 
-@Component
+@Service
+@Slf4j
 public class ServiceAPulsarHandler {
-    private static final Logger log = LoggerFactory.getLogger(ServiceAPulsarHandler.class);
-
     private final PulsarTemplate<ReplyMessage> replyTemplate;
     private final String responseTopic;
+
+    private final ObjectMapper mapper;
     private final String serviceName = "A";
 
     @Autowired
     public ServiceAPulsarHandler(PulsarTemplate<ReplyMessage> replyTemplate,
-                                 @Value("${app.pulsar.response-topic}") String responseTopic) {
+                                 @Value("${app.pulsar.response-topic}") String responseTopic,
+                                 ObjectMapper objectMapper) {
         this.replyTemplate = replyTemplate;
         this.responseTopic = responseTopic;
+        this.mapper = objectMapper;
     }
 
     @PulsarListener(
             topics = "${app.pulsar.command-topic}",
             subscriptionName = "svcA",
             schemaType = SchemaType.JSON,
-            subscriptionType = SubscriptionType.Exclusive)
+            subscriptionType = SubscriptionType.Exclusive,
+            ackMode = AckMode.MANUAL
+    )
     public void onCommand(CommandMessage cmd, Acknowledgement ack) throws PulsarClientException {
         try {
             if (cmd == null) {
@@ -52,26 +61,9 @@ public class ServiceAPulsarHandler {
             reply.setCorrelationId(cmd.getCorrelationId());
             reply.setService(serviceName);
 
-            if ("COMPENSATE".equalsIgnoreCase(cmd.getAction())) {
-                reply.setStatus(200);
-                reply.setMessage("Compensated A for: " + (cmd.getPayload() != null ? cmd.getPayload().getTag() : "n/a"));
-                replyTemplate.send(responseTopic, reply);
-                ack.acknowledge();
-                return;
-            }
-
-            TagRequest req = cmd.getPayload();
-            String tag = req != null ? req.getTag() : "null";
-
-            if ("failA0".equals(tag)) {
-                reply.setStatus(500);
-                reply.setError("Simulated failure in service A for tag " + tag);
-            } else {
-                reply.setStatus("failA1".equals(tag) ? 201 : 200);
-                reply.setMessage("Processed A: " + tag);
-            }
-
             replyTemplate.send(responseTopic, reply);
+            log.info("ServiceAPulsarHandler::onCommand reply={}", mapper.writeValueAsString(reply));
+
             ack.acknowledge();
 
         } catch (Exception ex) {
