@@ -4,7 +4,7 @@ spring:
       service-url: pulsar://localhost:6650
     consumer:
       subscription:
-        name: my-subscription
+        name: serviceA
     defaults:
       type-mappings:
         - messageType: com.example.model.CommandMessage

@@ -40,9 +40,9 @@ public class ServiceAPulsarHandler {
 
     @PulsarListener(
             topics = "${app.pulsar.command-topic}",
-            subscriptionName = "svcA",
+            subscriptionName = "serviceA",
             schemaType = SchemaType.JSON,
-            subscriptionType = SubscriptionType.Exclusive,
+            subscriptionType = SubscriptionType.Shared,
             ackMode = AckMode.MANUAL
     )
     public void onCommand(CommandMessage cmd, Acknowledgement ack) throws PulsarClientException {
