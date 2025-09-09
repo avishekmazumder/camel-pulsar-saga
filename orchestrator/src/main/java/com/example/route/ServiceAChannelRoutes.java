@@ -7,6 +7,7 @@ import com.example.messaging.OrchestratorPulsarProducer;
 import org.apache.camel.LoggingLevel;
 import org.apache.camel.builder.RouteBuilder;
 import org.apache.camel.Exchange;
+import org.apache.camel.component.pulsar.utils.message.PulsarMessageHeaders;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -70,7 +71,7 @@ public class ServiceAChannelRoutes extends RouteBuilder {
               + "&subscriptionInitialPosition=Latest"
               + "&consumerQueueSize=10";
 
-        from("pulsar:{{app.pulsar.service-a.response-topic}}" + consumerParams)
+/*        from("pulsar:{{app.pulsar.service-a.response-topic}}" + consumerParams)
             .routeId("consume-a-replies")
             .process(ex -> {
                 // Extract correlation from Pulsar properties
@@ -82,6 +83,34 @@ public class ServiceAChannelRoutes extends RouteBuilder {
             })
             .unmarshal().json(ReplyMessage.class)
             // fan-in to per-correlation SEDA channel
-            .toD("seda:replyA-${header.X-Correlation-Id}");
+            .toD("seda:replyA-${header.X-Correlation-Id}");*/
+
+        from("pulsar:{{app.pulsar.service-a.response-topic}}" + consumerParams)
+                .unmarshal().json(ReplyMessage.class) // ✅ first, convert JSON to POJO
+                .process(ex -> {
+                    String cid = null;
+
+                    // Pulsar properties
+                    Map<String, String> props = ex.getIn().getHeader(PulsarMessageHeaders.PROPERTIES, Map.class);
+                    if (props != null && props.get("X-Correlation-Id") != null) {
+                        cid = props.get("X-Correlation-Id");
+                    }
+
+                    // fallback to body.correlationId
+                    if (cid == null) {
+                        ReplyMessage r = ex.getIn().getBody(ReplyMessage.class);
+                        if (r != null) cid = r.getCorrelationId();
+                    }
+
+                    // Debug
+                    System.out.println("ReplyMessage body: " + ex.getIn().getBody(String.class));
+                    System.out.println("CID: " + cid);
+
+                    ex.getIn().setHeader("X-Correlation-Id", cid);
+                    ex.setProperty("cid", cid);
+                })
+                .toD("seda:replyA-${exchangeProperty.cid}");
+
+
     }
 }
