@@ -109,7 +109,8 @@ public class ServiceAChannelRoutes extends RouteBuilder {
                     ex.getIn().setHeader("X-Correlation-Id", cid);
                     ex.setProperty("cid", cid);
                 })
-                .toD("seda:replyA-${exchangeProperty.cid}");
+                .setHeader("corrId", simple("${exchangeProperty.cid}"))
+                .to("direct:agg-in");
 
 
     }
