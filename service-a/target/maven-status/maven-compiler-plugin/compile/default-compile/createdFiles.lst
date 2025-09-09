@@ -1,0 +1,8 @@
+com\example\model\ReplyMessage.class
+com\example\producer\EventPublisher.class
+com\example\model\CommandMessage.class
+com\example\ServiceAApplication.class
+com\example\controller\EventController.class
+com\example\messaging\ServiceAPulsarHandler.class
+com\example\model\TagRequest.class
+com\example\messaging\EventConsumer.class

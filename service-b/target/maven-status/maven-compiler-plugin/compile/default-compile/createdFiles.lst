@@ -1,0 +1,5 @@
+com\example\ServiceBApplication.class
+com\example\model\ReplyMessage.class
+com\example\model\TagRequest.class
+com\example\messaging\ServiceBPulsarHandler.class
+com\example\model\CommandMessage.class

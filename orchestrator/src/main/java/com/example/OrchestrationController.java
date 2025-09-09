@@ -20,7 +20,7 @@ public class OrchestrationController {
     @Autowired
     private ProducerTemplate producerTemplate;
 
-    @Autowired
+    //@Autowired
     EventPublisher publisher;
 
     @PostMapping
