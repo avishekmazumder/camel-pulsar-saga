@@ -1,89 +1,116 @@
 package com.example.messaging;
 
+
 import com.example.model.CommandMessage;
 import com.example.model.ReplyMessage;
-import com.example.model.TagRequest;
-import org.apache.pulsar.client.api.PulsarClientException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.pulsar.client.api.Message;
 import org.apache.pulsar.client.api.SubscriptionType;
 import org.apache.pulsar.common.schema.SchemaType;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.pulsar.annotation.PulsarListener;
-
 import org.springframework.pulsar.core.PulsarTemplate;
+import org.springframework.pulsar.listener.AckMode;
 import org.springframework.pulsar.listener.Acknowledgement;
 import org.springframework.stereotype.Component;
 
+import java.util.Map;
+import java.util.Optional;
+
+@Slf4j
 @Component
+@RequiredArgsConstructor
 public class ServiceAPulsarHandler {
-    private static final Logger log = LoggerFactory.getLogger(ServiceAPulsarHandler.class);
 
     private final PulsarTemplate<ReplyMessage> replyTemplate;
-    private final String responseTopic;
-    private final String serviceName = "A";
+    private final ObjectMapper mapper;
 
-    @Autowired
-    public ServiceAPulsarHandler(PulsarTemplate<ReplyMessage> replyTemplate,
-                                 @Value("${app.pulsar.response-topic}") String responseTopic) {
-        this.replyTemplate = replyTemplate;
-        this.responseTopic = responseTopic;
-    }
+    @Value("${app.service.name:A}")
+    private String serviceName;
+
+    @Value("${app.pulsar.response-topic}")
+    private String responseTopic;
 
     @PulsarListener(
             topics = "${app.pulsar.command-topic}",
-            subscriptionName = "svcA",
+            subscriptionName = "serviceA",
             schemaType = SchemaType.JSON,
-            subscriptionType = SubscriptionType.Exclusive)
-    public void onCommand(CommandMessage cmd, Acknowledgement ack) throws PulsarClientException {
+            subscriptionType = SubscriptionType.Shared,
+            ackMode = AckMode.MANUAL
+    )
+    public void onCommand(Message<CommandMessage> msg, Acknowledgement ack) {
+        String cid = null;
         try {
-            if (cmd == null) {
+            if (msg == null || msg.getValue() == null) {
                 ack.acknowledge();
                 return;
             }
 
+            CommandMessage cmd = msg.getValue();
+
+            // Only process commands that target this service
             if (cmd.getTargetService() == null || !serviceName.equalsIgnoreCase(cmd.getTargetService())) {
                 ack.acknowledge();
                 return;
             }
 
+            // Extract metadata from incoming Pulsar message
+            Map<String, String> inProps = Optional.ofNullable(msg.getProperties()).orElse(Map.of());
+            String incomingCid = inProps.get("X-Correlation-Id");
+            cid = Optional.ofNullable(incomingCid).orElse(cmd.getCorrelationId());
+            String key = Optional.ofNullable(msg.getKey()).orElse(cid);
+
+            // Build reply payload
             ReplyMessage reply = new ReplyMessage();
-            reply.setCorrelationId(cmd.getCorrelationId());
+            reply.setCorrelationId(cid);
             reply.setService(serviceName);
+            reply.setMessage("Processed A:" + (cmd.getPayload() != null ? cmd.getPayload().getTag() : "n/a"));
+            reply.setStatus(200);
 
-            if ("COMPENSATE".equalsIgnoreCase(cmd.getAction())) {
-                reply.setStatus(200);
-                reply.setMessage("Compensated A for: " + (cmd.getPayload() != null ? cmd.getPayload().getTag() : "n/a"));
-                replyTemplate.send(responseTopic, reply);
-                ack.acknowledge();
-                return;
-            }
+            // Send reply with key + properties (copy all incoming, enforce X-Correlation-Id)
+            String finalCid = cid;
+            replyTemplate
+                    .newMessage(reply)
+                    .withTopic(responseTopic)
+                    .withMessageCustomizer(mb -> {
+                        if (key != null) {
+                            mb.key(key);
+                        }
+                        // copy all existing properties from the incoming command
+                        inProps.forEach(mb::property);
 
-            TagRequest req = cmd.getPayload();
-            String tag = req != null ? req.getTag() : "null";
+                        // ensure X-Correlation-Id is present and correct
+                        if (finalCid != null) {
+                            mb.property("X-Correlation-Id", finalCid);
+                        }
+                    })
+                    .send();
 
-            if ("failA0".equals(tag)) {
-                reply.setStatus(500);
-                reply.setError("Simulated failure in service A for tag " + tag);
-            } else {
-                reply.setStatus("failA1".equals(tag) ? 201 : 200);
-                reply.setMessage("Processed A: " + tag);
-            }
+            log.info("ServiceAPulsarHandler::onCommand key={}, cid={}, props={}, reply={}",
+                    key, cid, inProps, mapper.writeValueAsString(reply));
 
-            replyTemplate.send(responseTopic, reply);
             ack.acknowledge();
 
         } catch (Exception ex) {
-            ReplyMessage reply = new ReplyMessage();
-            reply.setCorrelationId(cmd != null ? cmd.getCorrelationId() : "n/a");
-            reply.setService(serviceName);
-            reply.setStatus(500);
-            reply.setError(ex.getMessage());
-            replyTemplate.send(responseTopic, reply);
-            ack.acknowledge();
+            try {
+                // Best-effort error reply (no properties needed here, orchestrator may still parse JSON)
+                ReplyMessage error = new ReplyMessage();
+                error.setCorrelationId(cid);
+                error.setService(serviceName);
+                error.setStatus(500);
+                error.setError(ex.getMessage());
+                replyTemplate.send(responseTopic, error);
+            } catch (Exception ignore) {
+                // swallow secondary send errors
+            }
+            try { ack.acknowledge(); } catch (Exception ignore) {}
+            log.error("ServiceAPulsarHandler::onCommand failed", ex);
         }
     }
+
+
 
 
 /*@org.springframework.pulsar.annotation.PulsarListener(
