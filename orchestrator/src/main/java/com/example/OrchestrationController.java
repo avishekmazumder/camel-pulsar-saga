@@ -3,47 +3,66 @@ package com.example;
 
 import com.example.model.OrchestrationRequest;
 import com.example.model.OrchestrationResponse;
-import com.example.util.PendingSagaRegistry;
+import com.example.publisher.EventPublisher;
+import org.apache.camel.Exchange;
 import org.apache.camel.ProducerTemplate;
+import org.apache.pulsar.client.api.PulsarClientException;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.context.request.async.DeferredResult;
 
-import java.util.UUID;
+import static org.apache.camel.model.dataformat.JsonLibrary.Gson;
 
 @RestController
 @RequestMapping("/orchestrate")
 public class OrchestrationController {
 
-    private final ProducerTemplate producerTemplate;
-    private final PendingSagaRegistry pending;
+    @Autowired
+    private ProducerTemplate producerTemplate;
 
-    public OrchestrationController(ProducerTemplate producerTemplate, PendingSagaRegistry pending) {
-        this.producerTemplate = producerTemplate;
-        this.pending = pending;
-    }
+    @Autowired
+    EventPublisher publisher;
 
-    @PostMapping("/mq")
-    public DeferredResult<OrchestrationResponse> orchestrateMq(@RequestBody OrchestrationRequest request) {
-        String cid = UUID.randomUUID().toString();
-
-        // 1) register async holder
-        DeferredResult<OrchestrationResponse> dr =
-                pending.register(cid, 30000); // 30s timeout (match route REPLY_TIMEOUT_MS)
-
-        // 2) start saga asynchronously; route will read property 'cid'
-        producerTemplate.send("direct:startSagaMq", e -> {
-            e.getIn().setBody(request);
-            e.setProperty("cid", cid);
-        });
-
-        return dr;
-    }
-
-    // Optional: keep your older synchronous endpoint if you like under another path
     @PostMapping
-    public ResponseEntity<Object> orchestrateSync(@RequestBody OrchestrationRequest request) {
-        // For brevity, route not shown; keep existing if needed
-        return ResponseEntity.accepted().body("Use /orchestrate/mq for async");
+    public ResponseEntity<Object> orchestrate(@RequestBody OrchestrationRequest request) throws PulsarClientException {
+/*        Exchange exchange = producerTemplate.request("direct:startSaga", ex -> ex.getIn().setBody(request));
+
+        Integer statusCode = exchange.getMessage().getHeader(Exchange.HTTP_RESPONSE_CODE, Integer.class);
+        if (statusCode == null) {
+            statusCode = 500;
+        }
+        Object body = exchange.getMessage().getBody();
+        if (body instanceof OrchestrationResponse) {
+            OrchestrationResponse response = exchange.getMessage().getBody(OrchestrationResponse.class);
+            return ResponseEntity.status(statusCode).body(response);
+        } else {
+            return ResponseEntity.status(statusCode).body(body);  // plain error string
+        }*/
+
+        Exchange exchange = producerTemplate.request("direct:startSaga", ex -> ex.getIn().setBody(request));
+
+        int status = exchange.getMessage().getHeader(Exchange.HTTP_RESPONSE_CODE, Integer.class) != null
+                ? exchange.getMessage().getHeader(Exchange.HTTP_RESPONSE_CODE, Integer.class)
+                : (exchange.isFailed() ? 500 : 200);
+
+        Object body = exchange.getMessage().getBody();
+
+        if (status == 200) {
+            OrchestrationResponse response = (OrchestrationResponse) body;
+            publisher.publishRawMessage(response);
+        }
+        //publisher.publishPlainMessage("hello-world");
+
+        return ResponseEntity.status(status).body(body);
     }
+
+@PostMapping("/orchestrate-mq")
+public ResponseEntity<?> orchestrateMq(@RequestBody OrchestrationRequest request) {
+    Exchange exchange = producerTemplate.request("direct:startSagaMq", e -> e.getIn().setBody(request));
+    int status = exchange.getMessage().getHeader(Exchange.HTTP_RESPONSE_CODE, Integer.class) != null
+            ? exchange.getMessage().getHeader(Exchange.HTTP_RESPONSE_CODE, Integer.class)
+            : (exchange.isFailed() ? 500 : 200);
+    Object body = exchange.getMessage().getBody();
+    return ResponseEntity.status(status).body(body);
+}
 }

@@ -10,7 +10,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.pulsar.core.PulsarTemplate;
 import org.springframework.stereotype.Service;
 
-//@Service
+@Service
 public class EventPublisher {
 
     Logger log = LoggerFactory.getLogger(EventPublisher.class);

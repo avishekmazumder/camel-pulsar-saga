@@ -1,16 +1,30 @@
 
 package com.example.model;
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-
 import java.io.Serializable;
 
-@Data
-@AllArgsConstructor
-@NoArgsConstructor
-public class TagRequest {
+public class TagRequest implements Serializable {
+    public TagRequest(String tag) {
+        this.tag = tag;
+    }
+
+    public TagRequest() {
+    }
 
     private String tag;
+
+    public String getTag() {
+        return tag;
+    }
+
+    public void setTag(String tag) {
+        this.tag = tag;
+    }
+
+    @Override
+    public String toString() {
+        return "TagRequest{" +
+                "tag='" + tag + '\'' +
+                '}';
+    }
 }
