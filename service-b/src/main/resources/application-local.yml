@@ -2,17 +2,6 @@ spring:
   pulsar:
     client:
       service-url: pulsar://localhost:6650
-    consumer:
-      subscription:
-        name: serviceB
-    defaults:
-      type-mappings:
-        - messageType: com.example.model.CommandMessage
-          schema-info:
-            schema-type: JSON
-        - messageType: com.example.model.ReplyMessage
-          schema-info:
-            schema-type: JSON
 
 app:
   pulsar:
