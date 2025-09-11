@@ -14,7 +14,7 @@
         <dependency>
             <groupId>org.apache.camel.springboot</groupId>
             <artifactId>camel-jackson-starter</artifactId>
-            <version>4.4.5</version>
+            <version>4.3.0</version>
         </dependency>
     
         <dependency>
@@ -30,22 +30,17 @@
         <dependency>
             <groupId>org.apache.camel.springboot</groupId>
             <artifactId>camel-spring-boot-starter</artifactId>
-            <version>4.4.5</version>
+            <version>4.3.0</version>
         </dependency>
         <dependency>
             <groupId>org.apache.camel.springboot</groupId>
             <artifactId>camel-http-starter</artifactId>
-            <version>4.4.0</version>
+            <version>4.3.0</version>
         </dependency>
         <dependency>
             <groupId>org.apache.camel.springboot</groupId>
             <artifactId>camel-saga-starter</artifactId>
-            <version>4.4.5</version>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.camel.springboot</groupId>
-            <artifactId>camel-seda-starter</artifactId>
-            <version>4.4.5</version>
+            <version>4.3.0</version>
         </dependency>
 
         <dependency>
@@ -56,9 +51,8 @@
             <dependency>
             <groupId>org.apache.camel.springboot</groupId>
             <artifactId>camel-pulsar-starter</artifactId>
-            <version>4.4.5</version>
+            <version>4.3.0</version>
         </dependency>
-
             <dependency>
             <groupId>org.apache.pulsar</groupId>
             <artifactId>pulsar-client-admin</artifactId>
